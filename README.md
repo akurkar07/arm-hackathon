@@ -72,14 +72,27 @@ It intentionally excludes a web dashboard, API, database, MQTT, hardware integra
 
 ## Status
 
-**Planning and scaffold stage.** The repository currently does not yet contain the simulator, model, benchmark results, or a hardware deployment. The README is a contract for what will be built and measured, not evidence that it already exists.
+**Foundation stage.** The repository now contains deterministic two-zone plant
+telemetry, a primary-fan degradation scenario, and interpretable health/anomaly
+baselines adapted from an earlier actuator-monitoring prototype. These pieces
+support simulation tests and future synthetic-data generation; they are not the
+challenge inference model.
+
+The safety governor, replay runner, ONNX model, Arm benchmark results, and
+hardware deployment do not exist yet. This README remains a contract for those
+parts, not evidence that they have been built or measured.
 
 ## Intended usage
 
-Once the first slice lands, a clean environment should be able to run:
+The current foundation can be checked with:
 
 ```bash
 python -m pytest
+```
+
+Once the full first slice lands, a clean environment should also be able to run:
+
+```bash
 python -m icarus.run --scenario primary_fan_degradation --seed 7 --trace out/degradation.jsonl
 ```
 
