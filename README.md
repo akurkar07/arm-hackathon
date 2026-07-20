@@ -1,97 +1,109 @@
-# ICARUS
+# ICARUS Belimo Reference Branch
 
-> **Closed-loop fault response for a simulated habitat ventilation system, optimized for Arm.**
->
-> Submission in progress for the [Arm Create: AI Optimization Challenge 2026](https://arm-ai-optimization-challenge.devpost.com/) · **Physical AI track**
+This branch preserves the complete reusable Belimo actuator extraction from an
+earlier START Hack project. It exists as reference material for ICARUS while the
+team develops its simulated habitat ventilation system.
 
-ICARUS is a simulated two-zone habitat ventilation controller. It ingests telemetry from a circulation plant, uses a compact AI model to detect a degrading primary fan, and applies a deterministic safety governor to issue a bounded virtual command to a healthy redundant fan.
+Nothing in `belimo_reference/` should be treated as the final ICARUS design or
+as production control software. The code is retained so useful ideas can be
+adapted deliberately without losing their original context.
 
-```text
-simulated sensors → compact AI inference → safety governor → virtual actuator command
-       ↑                                                               │
-       └──────────── changed ventilation-plant state and replay ───────┘
-```
+## Where It Came From
 
-This is a simulation and research prototype. It makes no claim to control real spacecraft, life-support equipment, or certified safety-critical systems.
+The source was **Belimo Insight Copilot**, built for the Belimo challenge at
+START Hack 2026. That prototype monitored actuator telemetry, calculated health
+signals, injected demonstration faults, estimated downstream airflow impact,
+and exchanged measurements and commands through InfluxDB.
 
-## The demo
+The original hackathon project included a frontend, launch scripts, generated
+run data, Grafana assets, Docker configuration, and demo-specific defaults. A
+smaller reusable package was extracted from that project into the local
+`belimo extract` folder. This branch contains that extraction in full and
+unchanged under `belimo_reference/`.
 
-The first scenario is deliberately narrow:
+The extraction's own README is preserved at
+`belimo_reference/README.md`.
 
-1. A deterministic two-zone habitat ventilation plant begins in a nominal state.
-2. The primary circulation fan degrades, reducing actual airflow.
-3. Telemetry records airflow, CO2/air-quality proxy, temperature, commanded fan speed, actual fan output, and tracking residual.
-4. A compact ONNX model scores the telemetry window for a fault.
-5. The safety governor either commands a bounded boost to a healthy redundant fan or hands control back when telemetry/model output is invalid.
-6. The simulator applies that decision and writes a replay trace proving the resulting plant-state change.
+## Why It Is Here
 
-The point is not an animated dashboard. The point is a visible, testable loop: **fault → inference → safe decision → virtual action → recovery**.
+ICARUS and the Belimo prototype share several useful concepts:
 
-## Why Physical AI
+- normalized actuator and sensor telemetry;
+- command-versus-output tracking residuals;
+- health states based on movement, load, and settling behaviour;
+- rolling anomaly detection;
+- deterministic or injected fault conditions;
+- propagation from actuator state to airflow impact;
+- a pipeline that enriches each telemetry sample with health and fault data.
 
-The Arm Create Physical AI track accepts systems using real or simulated sensor data that produce control signals, anomaly detection, alerting, or actuator decisions for a physical system. ICARUS uses simulated environmental and actuator telemetry, performs local fault inference, and produces a virtual ventilation command under hard safety bounds.
+Keeping the full package on a separate branch gives the team a stable reference
+without adding Belimo, InfluxDB, pandas, or demo assumptions to the main ICARUS
+implementation.
 
-## Arm optimization evidence
-
-ICARUS will run inference on a declared Arm64 target. The project will publish a reproducible benchmark comparing:
-
-- FP32 ONNX inference against an INT8-quantized path
-- model artifact size
-- p50 and p95 inference latency
-- inference throughput / control-loop deadline behaviour
-- fault-detection quality and false alarms
-- target specification and exact benchmark commands
-
-No Raspberry Pi, NEON, Arm Performix, memory, latency, or sub-200 ms claim will be made until it has an attached measurement receipt from the declared target.
-
-## Planned first vertical slice
-
-The first runnable slice contains only the proof loop:
+## What Is Included
 
 ```text
-icarus/
-├── simulation/       # deterministic two-zone ventilation plant
-├── scenarios/        # nominal, primary fan degradation, invalid sensor
-├── model/            # synthetic-data training, FP32 ONNX export, inference
-├── control/          # safety governor and bounded virtual actuation
-├── traces/           # JSONL replay writer
-├── tests/            # scenario, safety, replay, and model-path tests
-└── benchmarks/       # added after the local loop is green
+belimo_reference/
+|-- README.md
+|-- requirements.txt
+`-- belimo_extract/
+    |-- __init__.py
+    |-- bridge.py
+    |-- faults.py
+    |-- health.py
+    |-- impact.py
+    |-- models.py
+    |-- pipeline.py
+    `-- utils.py
 ```
 
-It intentionally excludes a web dashboard, API, database, MQTT, hardware integration, and topology model. Those can wait until there is an actual system worth displaying.
+The package provides:
 
-## Acceptance conditions for the first slice
+- `BelimoInfluxBridge` for reading event telemetry and writing actuator
+  setpoints;
+- `InfluxAnalyticsSink` for storing enriched runtime samples;
+- `ActuatorHealthMonitor` for tracking, load, stall, and response states;
+- `ZScoreDetector` as a dependency-free rolling anomaly detector;
+- `FaultSimulator` for stuck, high-torque, and power-drop demonstrations;
+- `FaultPropagationGraph` for simple actuator-to-duct-to-room airflow impact;
+- dataclasses for telemetry, health metrics, and enriched runtime samples;
+- `process_telemetry` for composing those pieces into one processing step.
 
-- Nominal scenario produces no fault command.
-- Primary-fan degradation is injected deterministically and detected by the ONNX model.
-- Governor commands the redundant fan within its safe range, never above 80%.
-- Invalid telemetry produces `HAND_BACK`, not an autonomous command.
-- The replay trace is deterministic for a fixed scenario seed.
-- The trace demonstrates that the command changes simulated plant state and restores airflow above the scenario floor.
+## Relationship To ICARUS
 
-## Status
+The code should be used as a source of patterns, tests, and domain ideas. Before
+moving anything into the ICARUS implementation:
 
-**Planning and scaffold stage.** The repository currently does not yet contain the simulator, model, benchmark results, or a hardware deployment. The README is a contract for what will be built and measured, not evidence that it already exists.
+1. Rename Belimo actuator fields around ICARUS primary and redundant fans.
+2. Replace random demo faults with deterministic scenario schedules.
+3. Keep the z-score and rule-based health logic as baselines, not as substitutes
+   for the planned ONNX model.
+4. Keep live InfluxDB integration out of the first simulation slice.
+5. Replace the single actuator-to-room impact model with the declared two-zone
+   ventilation plant.
+6. Preserve ICARUS safety requirements, including bounded virtual commands and
+   `HAND_BACK` for invalid telemetry.
 
-## Intended usage
+The active ICARUS implementation belongs on its own feature branches. This
+branch is intentionally an archive and comparison point.
 
-Once the first slice lands, a clean environment should be able to run:
+## Running The Reference Package
+
+Install its optional integration dependencies with:
 
 ```bash
-python -m pytest
-python -m icarus.run --scenario primary_fan_degradation --seed 7 --trace out/degradation.jsonl
+python -m pip install -r belimo_reference/requirements.txt
 ```
 
-Expected result: a non-empty replay trace and summary showing injected degradation, model detection, safety-governed redundant-fan command, and recovery.
+The Influx bridge requires a reachable InfluxDB instance and valid connection
+settings. The health, fault, impact, and model modules can be imported without
+connecting to live hardware, although importing the package root currently
+loads the InfluxDB and pandas dependencies.
 
-## Safety and scope
+## Safety And Scope
 
-- Simulation only. No live plant, client, or production telemetry.
-- No real actuator command is emitted.
-- The governor enforces bounded commands and a handback path.
-- This is not a certified environmental-control or safety system.
-
-## License
-
-[MIT](LICENSE)
+- This is hackathon prototype code, not certified control software.
+- It must not issue commands to real habitat, life-support, or production HVAC
+  equipment.
+- No claim about Arm performance, model accuracy, or physical-system safety is
+  established by this reference branch.
